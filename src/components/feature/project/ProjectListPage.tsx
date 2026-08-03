@@ -1,28 +1,18 @@
-import { Metadata } from 'next';
-import {
-  Download,
-  FolderClosed,
-  Search,
-  SlidersHorizontal,
-} from 'lucide-react';
+import type { Metadata } from 'next';
+import { Download, FolderClosed } from 'lucide-react';
+import Link from 'next/link';
+
+import CreateProjectForm from '@/components/feature/project/CreateProjectForm';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
 } from '@/components/ui/pagination';
 import { Progress } from '@/components/ui/progress';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -32,18 +22,30 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { ProjectStatus } from '@/lib/api/api-type';
+import type {
+  Department,
+  GetProjectsQuery,
+  ProjectSortField,
+  ProjectStatus,
+  SortOrder,
+} from '@/lib/api/api-type';
+
 import { projectApi } from '@/lib/api/project.api';
 import { cn } from '@/lib/utils';
-import CreateProjectForm from '@/components/feature/project/CreateProjectForm';
-import Link from 'next/link';
+import { ProjectFilters } from '@/components/feature/project/ProjectFilters';
+import { ProjectSearchParams } from '@/app/(main)/project/page';
+import { ProjectPagination } from '@/components/feature/project/ProjectPagination';
 
 export const metadata: Metadata = {
   title: 'Projects',
 };
 
-// บังคับให้หน้าโหลดข้อมูลใหม่ ไม่ใช้ค่าที่ cache ไว้
+// บังคับให้หน้าโหลดข้อมูลใหม่ ไม่ใช้ข้อมูล cache
 export const dynamic = 'force-dynamic';
+
+type ProjectListPageProps = {
+  searchParams: ProjectSearchParams;
+};
 
 type ProjectRow = {
   id: string;
@@ -52,7 +54,8 @@ type ProjectRow = {
   business: string;
   technical: string;
   resources: number;
-  costMtd: string;
+  costMtd: number;
+  budgetCurrency: string;
   budgetUsage: number;
   status: ProjectStatus;
   lastUpdated: string;
@@ -70,11 +73,13 @@ const statusConfig: Record<
     className:
       'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400',
   },
+
   ARCHIVED: {
     dot: 'bg-amber-500',
     className:
       'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
   },
+
   INACTIVE: {
     dot: 'bg-muted-foreground',
     className: 'bg-muted text-muted-foreground',
@@ -111,25 +116,86 @@ function formatDate(date: string) {
   }).format(new Date(date));
 }
 
-export default async function ProjectListPage() {
-  const response = await projectApi.getProject();
+function formatMoney(amount: number, currency: string) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  const parsedValue = Number(value);
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    return fallback;
+  }
+
+  return parsedValue;
+}
+
+function createPageHref(currentParams: URLSearchParams, page: number) {
+  const params = new URLSearchParams(currentParams.toString());
+
+  params.set('page', String(page));
+
+  return `?${params.toString()}`;
+}
+
+export default async function ProjectListPage({
+  searchParams,
+}: ProjectListPageProps) {
+  const params = searchParams;
+  console.log(params.search);
+  const query: GetProjectsQuery = {
+    search: params.search,
+
+    status: params.status as ProjectStatus | undefined,
+
+    businessDepartment: params.businessDepartment as Department | undefined,
+
+    technicalDepartment: params.technicalDepartment as Department | undefined,
+
+    sortBy: (params.sortBy as ProjectSortField | undefined) ?? 'updatedAt',
+
+    order: (params.order as SortOrder | undefined) ?? 'desc',
+
+    page: parsePositiveInteger(params.page, 1),
+
+    limit: parsePositiveInteger(params.limit, 10),
+  };
+
+  const response = await projectApi.getProject(query);
 
   const projects: ProjectRow[] = response.items.map((project) => ({
     id: project.id,
+
     name: project.projectName,
 
-    // ถ้า response ไม่มี description ให้ใช้ projectCode แทนได้
     category: project.description ?? project.projectCode ?? '-',
 
     business: project.businessDepartment,
+
     technical: project.technicalDepartment,
+
     resources: project._count.resources,
-    costMtd: '$0.00',
-    budgetUsage: 0,
+
+    costMtd: Number(project.costMtd),
+
+    budgetCurrency: project.budgetCurrency,
+
+    budgetUsage: project.budgetUsage,
+
     status: project.status,
+
     lastUpdated: project.updatedAt,
   }));
 
+  /*
+   * ตอนนี้ 3 ค่านี้คำนวณจาก projects ในหน้าปัจจุบัน
+   * ถ้า limit = 10 จะรวมเฉพาะ 10 รายการในหน้านั้น
+   */
   const activeCount = projects.filter(
     (project) => project.status === 'ACTIVE',
   ).length;
@@ -139,18 +205,59 @@ export default async function ProjectListPage() {
     0,
   );
 
+  const totalCostMtd = projects.reduce(
+    (total, project) => total + project.costMtd,
+    0,
+  );
+
+  const summaryCurrency = projects[0]?.budgetCurrency ?? 'USD';
+
   const start =
     response.totalItems === 0 ? 0 : (response.page - 1) * response.limit + 1;
 
   const end = Math.min(response.page * response.limit, response.totalItems);
 
+  /*
+   * ใช้สร้าง pagination โดยรักษา filter เดิมไว้
+   *
+   * เช่น:
+   * ?status=ACTIVE&businessDepartment=FINANCE&page=2
+   */
+  const paginationParams = new URLSearchParams();
+
+  if (params.search) {
+    paginationParams.set('search', params.search);
+  }
+
+  if (params.status) {
+    paginationParams.set('status', params.status);
+  }
+
+  if (params.businessDepartment) {
+    paginationParams.set('businessDepartment', params.businessDepartment);
+  }
+
+  if (params.technicalDepartment) {
+    paginationParams.set('technicalDepartment', params.technicalDepartment);
+  }
+
+  if (params.sortBy) {
+    paginationParams.set('sortBy', params.sortBy);
+  }
+
+  if (params.order) {
+    paginationParams.set('order', params.order);
+  }
+
+  if (params.limit) {
+    paginationParams.set('limit', params.limit);
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Page heading */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
-        </div>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
 
         <CreateProjectForm />
       </div>
@@ -169,48 +276,23 @@ export default async function ProjectListPage() {
 
         <StatCard
           label="TOTAL COST MTD"
-          value="$0.00"
+          value={formatMoney(totalCostMtd, summaryCurrency)}
           valueClassName="text-primary"
         />
       </div>
 
       {/* Search and filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative max-w-sm flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-
-            <Input
-              placeholder="Search projects, owners, teams..."
-              className="pl-8"
-            />
-          </div>
-
-          <Select defaultValue="all">
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-              <SelectItem value="ARCHIVED">ARCHIVED</SelectItem>
-              <SelectItem value="INACTIVE">INACTIVE</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline">
-            <SlidersHorizontal />
-            Filters
-          </Button>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0 flex-1">
+          <ProjectFilters />
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="whitespace-nowrap text-sm text-muted-foreground">
             {projects.length} of {response.totalItems} projects
           </span>
 
-          <Button variant="outline">
+          <Button type="button" variant="outline">
             <Download />
             Export
           </Button>
@@ -263,12 +345,13 @@ export default async function ProjectListPage() {
                   colSpan={8}
                   className="h-32 text-center text-muted-foreground"
                 >
-                  No projects found
+                  No projects match the selected filters.
                 </TableCell>
               </TableRow>
             ) : (
               projects.map((project) => {
                 const status = statusConfig[project.status];
+
                 const isHighUsage = project.budgetUsage >= 60;
 
                 return (
@@ -278,33 +361,31 @@ export default async function ProjectListPage() {
                         href={`/project/${project.id}`}
                         className="flex items-center gap-3"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <FolderClosed className="size-4" />
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <FolderClosed className="size-4" />
+                        </span>
+
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate font-medium text-foreground">
+                            {project.name}
                           </span>
 
-                          <div className="flex flex-col">
-                            <span className="font-medium text-foreground">
-                              {project.name}
-                            </span>
-
-                            <span className="text-xs text-muted-foreground">
-                              {project.category}
-                            </span>
-                          </div>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {project.category}
+                          </span>
                         </div>
                       </Link>
                     </TableCell>
 
                     <TableCell>
                       <span className="text-sm text-foreground">
-                        {project.business}
+                        {project.business.replaceAll('_', ' ')}
                       </span>
                     </TableCell>
 
                     <TableCell>
                       <span className="text-sm text-foreground">
-                        {project.technical}
+                        {project.technical.replaceAll('_', ' ')}
                       </span>
                     </TableCell>
 
@@ -313,13 +394,13 @@ export default async function ProjectListPage() {
                     </TableCell>
 
                     <TableCell className="font-medium">
-                      {project.costMtd}
+                      {formatMoney(project.costMtd, project.budgetCurrency)}
                     </TableCell>
 
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Progress
-                          value={project.budgetUsage}
+                          value={Math.min(project.budgetUsage, 100)}
                           className={cn(
                             'w-24 gap-0',
                             isHighUsage
@@ -330,7 +411,7 @@ export default async function ProjectListPage() {
 
                         <span
                           className={cn(
-                            'w-9 text-xs font-medium tabular-nums',
+                            'w-12 text-xs font-medium tabular-nums',
                             isHighUsage
                               ? 'text-amber-600 dark:text-amber-400'
                               : 'text-foreground',
@@ -361,37 +442,16 @@ export default async function ProjectListPage() {
           </TableBody>
         </Table>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
+        {/* Pagination footer */}
+        <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             Showing {start}–{end} of {response.totalItems} projects
           </span>
 
-          <Pagination className="mx-0 w-auto justify-end">
-            <PaginationContent>
-              {Array.from({ length: response.totalPages }, (_, index) => {
-                const page = index + 1;
-                const isActive = response.page === page;
-
-                return (
-                  <PaginationItem key={page}>
-                    <a
-                      href={`?page=${page}`}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={cn(
-                        'inline-flex size-9 items-center justify-center rounded-md text-sm font-medium transition-colors',
-                        'hover:bg-accent hover:text-accent-foreground',
-                        isActive &&
-                          'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
-                      )}
-                    >
-                      {page}
-                    </a>
-                  </PaginationItem>
-                );
-              })}
-            </PaginationContent>
-          </Pagination>
+          <ProjectPagination
+            currentPage={response.page}
+            totalPages={response.totalPages}
+          />
         </div>
       </Card>
     </div>

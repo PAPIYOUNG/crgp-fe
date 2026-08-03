@@ -1,10 +1,22 @@
 import ProjectListPage from '@/components/feature/project/ProjectListPage';
-import { Metadata } from 'next';
 
-export const metadata: Metadata = {
-  title: 'Projects',
+export type ProjectSearchParams = {
+  search?: string;
+  status?: string;
+  businessDepartment?: string;
+  technicalDepartment?: string;
+  sortBy?: string;
+  order?: string;
+  page?: string;
+  limit?: string;
 };
 
-export default function Page() {
-  return <ProjectListPage />;
+type ProjectPageProps = {
+  searchParams: Promise<ProjectSearchParams>;
+};
+
+export default async function ProjectPage({ searchParams }: ProjectPageProps) {
+  const params = await searchParams;
+
+  return <ProjectListPage searchParams={params} />;
 }

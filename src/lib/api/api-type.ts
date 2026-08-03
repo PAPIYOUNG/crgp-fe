@@ -93,6 +93,10 @@ export type ProjectResponseItem = {
   createdBy: ProjectCreatedBy;
 
   _count: ProjectCount;
+
+  costMtd: string;
+  budgetUsage: number;
+  remainingBudget: string | null;
 };
 
 export type GetProjectsResponse = {
@@ -124,6 +128,37 @@ export type UpdateProjectRequest = {
   status?: ProjectStatus;
   startDate?: string;
   endDate?: string;
+};
+
+//Filter Project
+
+export const projectStatuses = ['ACTIVE', 'INACTIVE', 'ARCHIVED'] as const;
+
+export const projectSortFields = [
+  'projectName',
+  'createdAt',
+  'updatedAt',
+  'startDate',
+  'endDate',
+  'monthlyBudget',
+  'status',
+  'businessDepartment',
+  'technicalDepartment',
+] as const;
+
+export type ProjectSortField = (typeof projectSortFields)[number];
+
+export type SortOrder = 'asc' | 'desc';
+
+export type GetProjectsQuery = {
+  search?: string;
+  businessDepartment?: Department;
+  technicalDepartment?: Department;
+  status?: ProjectStatus;
+  sortBy?: ProjectSortField;
+  order?: SortOrder;
+  page?: number;
+  limit?: number;
 };
 
 export type ProjectMemberRole = 'BUSINESS_OWNER' | 'TECHNICAL_OWNER' | 'MEMBER';
@@ -220,8 +255,17 @@ export type GetOneProjectResponse = {
 };
 
 //Cloud Resource API Types
-
+export type ResourceSource = 'MANUAL' | 'AWS_CONFIG';
 export type Environment = 'DEV' | 'UAT' | 'STAGING' | 'PRODUCTION';
+
+export type CloudResourceSortField =
+  | 'resourceName'
+  | 'resourceIdentifier'
+  | 'resourceType'
+  | 'region'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'lastSyncedAt';
 
 export type CloudResourceAwsAccount = {
   id: string;
@@ -270,12 +314,59 @@ export type CloudResourcePagination = {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
 };
-
+export type CloudResourceSummary = {
+  EC2: number;
+  RDS: number;
+  S3: number;
+  LAMBDA: number;
+  EKS: number;
+  LOAD_BALANCER: number;
+  WAF: number;
+  CDN: number;
+  NETWORKING: number;
+  OTHER: number;
+};
 export type GetCloudResourcesResponse = {
   items: CloudResourceResponse[];
   pagination: CloudResourcePagination;
+  summary: CloudResourceSummary;
 };
 
+export type ResourceService =
+  | 'EC2'
+  | 'RDS'
+  | 'S3'
+  | 'LAMBDA'
+  | 'EKS'
+  | 'LOAD_BALANCER'
+  | 'WAF'
+  | 'CDN'
+  | 'NETWORKING'
+  | 'OTHER';
+export type GetCloudResourcesQuery = {
+  page?: number;
+  limit?: number;
+
+  search?: string;
+
+  awsAccountId?: string;
+
+  projectId?: string;
+  ownerId?: string;
+
+  service?: ResourceService;
+  resourceType?: string;
+  region?: string;
+
+  source?: ResourceSource;
+  environment?: Environment;
+
+  isDeleted?: boolean;
+  unassigned?: boolean;
+
+  sortBy?: CloudResourceSortField;
+  order?: SortOrder;
+};
 export type CloudResourceUpdateRequest = {
   projectId?: string | null;
   ownerId?: string | null;
