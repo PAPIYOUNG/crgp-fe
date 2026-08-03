@@ -1,31 +1,34 @@
-import {
+import type {
   CloudResourceResponse,
+  CloudResourceUpdateRequest,
   GetCloudResourcesResponse,
 } from '@/lib/api/api-type';
+
 import { authFetch } from '@/lib/api/auth-fetch';
 
 export const cloudResourceApi = {
-  // The backend has been observed returning either a bare array or the
-  // paginated { items, pagination } shape — normalize at the call site.
-  async getCloudResourceList(): Promise<
-    CloudResourceResponse[] | GetCloudResourcesResponse
-  > {
-    return authFetch('/cloud-resource');
+  async getCloudResourceList(): Promise<GetCloudResourcesResponse> {
+    return authFetch<GetCloudResourcesResponse>('/cloud-resource');
   },
 
   async getOneCloudResource(
     cloudResourceId: string,
   ): Promise<CloudResourceResponse> {
-    return authFetch(`/cloud-resource/${cloudResourceId}`);
+    return authFetch<CloudResourceResponse>(
+      `/cloud-resource/${cloudResourceId}`,
+    );
   },
 
-  async EditCloudResource(
+  async editCloudResource(
     cloudResourceId: string,
-    data: Partial<CloudResourceResponse>,
+    data: CloudResourceUpdateRequest,
   ): Promise<CloudResourceResponse> {
-    return authFetch(`/cloud-resource/${cloudResourceId}`, {
-      method: 'PATCH',
-      body: data,
-    });
+    return authFetch<CloudResourceResponse>(
+      `/cloud-resource/${cloudResourceId}`,
+      {
+        method: 'PATCH',
+        body: data,
+      },
+    );
   },
 };

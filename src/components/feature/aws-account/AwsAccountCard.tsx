@@ -1,9 +1,12 @@
-import { Database, Eye } from 'lucide-react';
+import { Database, Eye, Pen } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 
 import { cn } from '@/lib/utils';
+import EditAwsAccountForm from '@/components/feature/aws-account/EditAwsAccountForm';
+import { AwsAccountResponse } from '@/lib/api/api-type';
+import AwsSyncForm from '@/components/feature/aws-account/AwsSyncForm';
 
 export type AwsAccountHealth = 'HEALTHY' | 'WARNING' | 'CRITICAL';
 
@@ -45,11 +48,15 @@ const healthConfig: Record<
   },
 };
 
+type AwsAccountCardProps = {
+  account: AwsAccountCardData;
+  rawAccount: AwsAccountResponse;
+};
+
 export default function AwsAccountCard({
   account,
-}: {
-  account: AwsAccountCardData;
-}) {
+  rawAccount,
+}: AwsAccountCardProps) {
   const health = healthConfig[account.health];
 
   return (
@@ -67,11 +74,19 @@ export default function AwsAccountCard({
             </p>
           </div>
         </div>
+        <div className="flex w-36 flex-col gap-3">
+          <Badge
+            className={cn(
+              'w-full justify-center gap-1.5 shadow-md',
+              health.className,
+            )}
+          >
+            <span className={cn('size-1.5 rounded-full ', health.dot)} />
+            {health.label}
+          </Badge>
 
-        <Badge className={cn('gap-1.5', health.className)}>
-          <span className={cn('size-1.5 rounded-full', health.dot)} />
-          {health.label}
-        </Badge>
+          <AwsSyncForm awsAccountId={account.id} />
+        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-4">
@@ -142,6 +157,7 @@ export default function AwsAccountCard({
           <Eye className="size-3.5" />
           View Resources
         </a>
+        <EditAwsAccountForm account={rawAccount} />
       </div>
     </Card>
   );

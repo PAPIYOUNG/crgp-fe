@@ -1,3 +1,8 @@
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
+export type SystemRole = 'ADMIN' | 'USER';
+
+export type GetAllUsersResponse = UserResponse[];
+
 export type UserResponse = {
   id: string;
   email: string;
@@ -152,10 +157,39 @@ export type ProjectAwsAccountLink = {
   };
 };
 
+export type ProjectResourceTag = {
+  tagKey: string;
+  tagValue: string;
+};
+
 export type ProjectResourceItem = {
   id: string;
-  environment: string | null;
+  resourceName: string | null;
+  resourceIdentifier: string;
   resourceType: string;
+  region: string | null;
+  awsAccount: CloudResourceAwsAccount | null;
+  environment: string | null;
+  tags: ProjectResourceTag[];
+};
+
+export type ProjectAwsAccountItem = {
+  id: string;
+  awsAccountId: string;
+  accountName: string;
+  defaultRegion: string;
+};
+
+export type ProjectStats = {
+  resources: number;
+  servicesCount: number;
+  costMtd: string;
+  costMtdChangePct: number;
+  membersCount: number;
+  ownersCount: number;
+  editorsCount: number;
+  budgetUsedPct: number;
+  remainingBudget: string | null;
 };
 
 export type GetOneProjectResponse = {
@@ -170,21 +204,19 @@ export type GetOneProjectResponse = {
   status: ProjectStatus;
   startDate: string | null;
   endDate: string | null;
-  createdById: string;
   createdAt: string;
   updatedAt: string;
 
   createdBy: ProjectCreatedBy;
 
+  environment: Environment[];
+  tags: string[];
+
+  awsAccounts: ProjectAwsAccountItem[];
   members: ProjectMember[];
-  projectAwsAccounts: ProjectAwsAccountLink[];
   resources: ProjectResourceItem[];
 
-  _count: {
-    members: number;
-    projectAwsAccounts: number;
-    resources: number;
-  };
+  stats: ProjectStats;
 };
 
 //Cloud Resource API Types
@@ -249,6 +281,25 @@ export type CloudResourceUpdateRequest = {
   ownerId?: string | null;
   environment?: Environment | null;
   description?: string | null;
+};
+
+//ผูก Cloud Resource กับ Project
+export type AddResourceToProjectRequest = {
+  resourceId: string;
+};
+
+export type GetResourcesByAwsAccountRequest = {
+  awsAccountId: string; // UUID ของ aws_accounts
+};
+
+export type CloudResourceOption = {
+  id: string;
+  resourceIdentifier: string;
+  resourceName: string | null;
+  resourceType: string;
+  region: string;
+  projectId: string | null;
+  awsAccountId: string;
 };
 
 //AWS Account API Types
@@ -329,5 +380,70 @@ export type VerifyAwsAccountResponse = {
     Account?: string;
     Arn?: string;
     UserId?: string;
+  };
+};
+
+//Member project
+export type AddProjectMemberRequest = {
+  userId: string;
+  memberRole: 'MEMBER' | 'TECHNICAL_OWNER';
+};
+export type UserOption = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: Department;
+  status: 'ACTIVE' | 'INACTIVE';
+};
+
+//sync aws
+export type SyncConfigResult = {
+  syncJobId: string;
+  accountId: string;
+  received: number;
+  created: number;
+  updated: number;
+  restored: number;
+  deleted: number;
+  syncedAt: string;
+};
+
+export type SyncTagResult = {
+  syncJobId: string;
+  accountId: string;
+  received: number;
+  matched: number;
+  created: number;
+  updated: number;
+  deleted: number;
+  skipped: number;
+  failed: number;
+  syncedAt: string;
+};
+
+export type SyncCostResult = {
+  syncJobId: string;
+  accountId: string;
+  periodStart: string;
+  periodEnd: string;
+  received: number;
+  created: number;
+  updated: number;
+  failed: number;
+  syncedAt: string;
+};
+
+export type SyncAllAwsResponse = {
+  message: string;
+  awsAccountId: string;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+
+  results: {
+    config: SyncConfigResult;
+    tags: SyncTagResult;
+    cost: SyncCostResult;
   };
 };

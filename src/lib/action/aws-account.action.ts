@@ -12,6 +12,10 @@ import {
   VerifyAwsAccountInput,
   verifyAwsAccountSchema,
 } from '@/lib/schema/verify-aws-account.schema';
+import {
+  EditAwsAccountInput,
+  editAwsAccountSchema,
+} from '@/lib/schema/edit-aws-account.schema';
 
 export async function createAwsAccountAction(input: CreateAwsAccountInput) {
   const parsed = createAwsAccountSchema.safeParse(input);
@@ -94,4 +98,50 @@ export async function verifyAwsAccountAction(input: VerifyAwsAccountInput) {
 
     throw error;
   }
+}
+
+export async function updateAwsAccountAction(
+  accountId: string,
+  input: EditAwsAccountInput,
+) {
+  const parsed = editAwsAccountSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      success: false as const,
+      message: 'Please check the AWS account details.',
+    };
+  }
+
+  const data = parsed.data;
+
+  const payload = {
+    awsAccountId: data.awsAccountId || undefined,
+    accountName: data.accountName || undefined,
+    ownerDepartment: data.ownerDepartment,
+    defaultRegion: data.defaultRegion || undefined,
+    roleArn: data.roleArn || undefined,
+    isActive: data.isActive,
+  };
+
+  try {
+    await AwsAccountApi.updateAwsAccount(accountId, payload);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return {
+        success: false as const,
+        status: error.status,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    throw error;
+  }
+
+  revalidatePath('/aws-accounts');
+
+  return {
+    success: true as const,
+  };
 }

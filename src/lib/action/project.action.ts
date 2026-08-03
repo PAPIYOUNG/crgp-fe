@@ -35,7 +35,7 @@ export async function createProjectAction(input: CreateProjectInput) {
   try {
     //console.log('payload sent to backend:', payload);
 
-    const project = await projectApi.createProject(payload);
+    await projectApi.createProject(payload);
 
     //console.log('project returned from backend:', project);
   } catch (error) {

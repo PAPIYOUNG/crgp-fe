@@ -44,35 +44,30 @@ function getAwsAccountHealth(account: {
 export default async function AwsAccountList() {
   const response = await AwsAccountApi.getAwsAccountList();
 
-  const accounts: AwsAccountCardData[] = response.items.map((account) => ({
-    id: account.id,
+  const accounts = response.items.map((rawAccount) => ({
+    rawAccount,
 
-    name: account.accountName,
+    cardData: {
+      id: rawAccount.id,
+      name: rawAccount.accountName,
 
-    accountId: account.awsAccountId,
+      accountId: rawAccount.awsAccountId,
+      owner: rawAccount.ownerDepartment,
+      resourceCount: rawAccount._count.resources,
+      defaultRegion: rawAccount.defaultRegion,
 
-    owner: account.ownerDepartment,
+      health: getAwsAccountHealth(rawAccount),
 
-    resourceCount: account._count.resources,
-    activeRegionCount: 1,
+      costMtd: Number(rawAccount.costMtd ?? 0),
+      totalCost: Number(rawAccount.totalCost ?? 0),
+      costCurrency: rawAccount.costCurrency ?? 'USD',
 
-    health: getAwsAccountHealth(account),
-
-    defaultRegion: account.defaultRegion,
-    connectionStatus: account.connectionStatus,
-
-    lastConfigSyncedAt: account.lastConfigSyncedAt,
-    lastCostSyncedAt: account.lastCostSyncedAt,
-    lastTagSyncedAt: account.lastTagSyncedAt,
-
-    costMtd: Number(account.costMtd ?? 0),
-    totalCost: Number(account.totalCost ?? 0),
-    costCurrency: account.costCurrency ?? 'USD',
-    resourcesHref: `/cloud-resources?awsAccountId=${account.id}`,
+      resourcesHref: `/cloud-resources?awsAccountId=${rawAccount.id}`,
+    } satisfies AwsAccountCardData,
   }));
 
   const healthyCount = accounts.filter(
-    (account) => account.health === 'HEALTHY',
+    (account) => account.cardData.health === 'HEALTHY',
   ).length;
 
   return (
@@ -95,8 +90,12 @@ export default async function AwsAccountList() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {accounts.map((account) => (
-          <AwsAccountCard key={account.id} account={account} />
+        {accounts.map(({ cardData, rawAccount }) => (
+          <AwsAccountCard
+            key={rawAccount.id}
+            account={cardData}
+            rawAccount={rawAccount}
+          />
         ))}
 
         <CreateAwsAccountForm variant="tile" />

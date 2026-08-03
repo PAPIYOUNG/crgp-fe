@@ -1,6 +1,8 @@
 import {
   CreateAwsAccountRequest,
   GetAwsAccountsResponse,
+  UpdateAwsAccountRequest,
+  VerifyAwsAccountResponse,
 } from '@/lib/api/api-type';
 import { authFetch } from '@/lib/api/auth-fetch';
 

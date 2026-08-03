@@ -6,14 +6,12 @@ import {
   Cloud,
   DollarSign,
   FolderClosed,
-  Plus,
   Server,
   Users,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   Table,
@@ -29,6 +27,14 @@ import { ApiError } from '@/lib/api/api-error';
 import { ProjectMemberRole, ProjectStatus } from '@/lib/api/api-type';
 import { projectApi } from '@/lib/api/project.api';
 import { cn } from '@/lib/utils';
+import AddAwsAccountToProjectForm from '@/components/feature/project/AddAwsaccountToProjectForm';
+import { AwsAccountApi } from '@/lib/api/aws-account.api';
+import AddCloudResourceForm from '@/components/feature/cloud-resource/AddCloudResourceForm';
+import RemoveResourceFromProjectForm from '@/components/feature/cloud-resource/RemoveResourceFromProjectForm';
+import AddMemberToProjectForm from '@/components/feature/member/AddMemberToProjectForm';
+import { userApi } from '@/lib/api/user.api';
+import RemoveMemberFromProjectForm from '@/components/feature/member/RemoveMemberFromProjectForm';
+import RemoveAwsaccountFromProjectForm from '@/components/feature/project/RemoveAwsaccountFromProjectForm';
 
 export const metadata: Metadata = {
   title: 'Project',
@@ -139,24 +145,33 @@ export default async function ProjectDetailPage({
 }) {
   const { projectId } = await params;
 
-  let project;
-  try {
-    project = await projectApi.getOneProject(projectId);
-  } catch (error) {
-    if (error instanceof ApiError && error.statusCode === 404) {
+  const [project, awsAccountsResponse, usersResponse] = await Promise.all([
+    projectApi.getOneProject(projectId),
+    AwsAccountApi.getAwsAccountList(),
+    userApi.getAllUsers(),
+  ]).catch((error: unknown) => {
+    if (error instanceof ApiError && error.status === 404) {
       notFound();
     }
-    throw error;
-  }
 
+    throw error;
+  });
+  const awsAccounts = awsAccountsResponse.items;
+  const users = usersResponse;
+
+  const resources = project.resources ?? [];
+  const members = project.members ?? [];
+
+  const existingMemberUserIds = members.map((member) => member.user.id);
   const status = statusConfig[project.status];
 
-  const members = project.members ?? [];
-  const resources = project.resources ?? [];
-  const projectAwsAccounts = project.projectAwsAccounts ?? [];
-  const counts = project._count ?? {
-    members: members.length,
-    resources: resources.length,
+  const projectAwsAccounts = project.awsAccounts ?? [];
+
+  const linkedAwsAccountIds = projectAwsAccounts.map((account) => account.id);
+
+  const counts = {
+    members: project.stats.membersCount,
+    resources: project.stats.resources,
     projectAwsAccounts: projectAwsAccounts.length,
   };
 
@@ -167,9 +182,7 @@ export default async function ProjectDetailPage({
   ).length;
   const membersCount = members.length - ownersCount;
 
-  const resourceTypeCount = new Set(
-    resources.map((resource) => resource.resourceType),
-  ).size;
+  const resourceTypeCount = project.stats.servicesCount;
 
   return (
     <div className="space-y-6 p-6">
@@ -219,10 +232,15 @@ export default async function ProjectDetailPage({
 
         <div className="flex shrink-0 items-center gap-2">
           <EditProjectForm project={project} />
-          <Button>
-            <Plus />
-            Add Resource
-          </Button>
+          <AddAwsAccountToProjectForm
+            projectId={project.id}
+            awsAccounts={awsAccounts}
+            linkedAwsAccountIds={linkedAwsAccountIds}
+          />
+          <AddCloudResourceForm
+            projectId={project.id}
+            awsAccounts={awsAccounts}
+          />
         </div>
       </div>
 
@@ -242,12 +260,15 @@ export default async function ProjectDetailPage({
 
         <StatCard
           label="Cost MTD"
-          value="$0.00"
+          value={new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: project.budgetCurrency,
+          }).format(Number(project.stats.costMtd))}
           icon={DollarSign}
           iconClassName="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
           footer={
             <span className="text-xs text-muted-foreground">
-              Cost tracking coming soon
+              {project.stats.costMtdChangePct}% from previous month
             </span>
           }
         />
@@ -312,33 +333,49 @@ export default async function ProjectDetailPage({
               </Card>
 
               <Card className="p-6">
-                <h2 className="text-base font-semibold text-foreground">
-                  AWS Accounts
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-foreground">
+                    AWS Accounts
+                  </h2>
+                  <AddAwsAccountToProjectForm
+                    projectId={project.id}
+                    awsAccounts={awsAccounts}
+                    linkedAwsAccountIds={linkedAwsAccountIds}
+                  />
+                </div>
 
                 {projectAwsAccounts.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    No AWS accounts linked yet.
-                  </p>
+                  <div>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      No AWS accounts linked yet.
+                    </p>
+                  </div>
                 ) : (
                   <div className="mt-4 space-y-3">
-                    {projectAwsAccounts.map((link) => (
+                    {projectAwsAccounts.map((account) => (
                       <div
-                        key={link.id}
+                        key={account.id}
                         className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
                       >
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {link.awsAccount.accountName}
-                          </p>
-                          <p className="font-mono text-xs text-muted-foreground">
-                            {link.awsAccount.awsAccountId}
-                          </p>
-                        </div>
+                        <div className="flex">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {account.accountName}
+                            </p>
 
-                        <Badge variant="outline">
-                          {link.awsAccount.defaultRegion}
-                        </Badge>
+                            <p className="font-mono text-xs text-muted-foreground">
+                              {account.awsAccountId}
+                            </p>
+                          </div>
+                          <Badge variant="outline">
+                            {account.defaultRegion}
+                          </Badge>
+                        </div>
+                        <RemoveAwsaccountFromProjectForm
+                          projectId={project.id}
+                          awsAccountId={account.id}
+                          accountName={account.accountName}
+                        />
                       </div>
                     ))}
                   </div>
@@ -401,9 +438,16 @@ export default async function ProjectDetailPage({
               </Card>
 
               <Card className="p-6">
-                <h2 className="text-base font-semibold text-foreground">
-                  Members
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-semibold text-foreground">
+                    Members
+                  </h2>
+                  <AddMemberToProjectForm
+                    projectId={project.id}
+                    users={users}
+                    existingMemberUserIds={existingMemberUserIds}
+                  />
+                </div>
 
                 {members.length === 0 ? (
                   <p className="mt-3 text-sm text-muted-foreground">
@@ -436,8 +480,16 @@ export default async function ProjectDetailPage({
                               </p>
                             </div>
                           </div>
-
-                          <Badge className={role.className}>{role.label}</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className={role.className}>
+                              {role.label}
+                            </Badge>
+                            <RemoveMemberFromProjectForm
+                              projectId={project.id}
+                              userId={member.user.id}
+                              memberName={`${member.user.firstName} ${member.user.lastName}`}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -450,6 +502,15 @@ export default async function ProjectDetailPage({
 
         <TabsPanel value="resources">
           <Card className="overflow-hidden py-0">
+            <div className="flex items-center justify-between p-6">
+              <h2 className="text-base font-semibold text-foreground">
+                Cloud Resources
+              </h2>
+              <AddCloudResourceForm
+                projectId={project.id}
+                awsAccounts={awsAccounts}
+              />
+            </div>
             {resources.length === 0 ? (
               <p className="p-6 text-sm text-muted-foreground">
                 No resources linked to this project yet.
@@ -458,7 +519,11 @@ export default async function ProjectDetailPage({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Resource Name</TableHead>
                     <TableHead>Resource Type</TableHead>
+                    <TableHead>Resource Identifier</TableHead>
+                    <TableHead>region</TableHead>
+                    <TableHead>AWS Account</TableHead>
                     <TableHead>Environment</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -466,9 +531,38 @@ export default async function ProjectDetailPage({
                   {resources.map((resource) => (
                     <TableRow key={resource.id}>
                       <TableCell className="font-mono text-sm">
+                        {resource.resourceName ?? resource.resourceIdentifier}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
                         {resource.resourceType}
                       </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {resource.resourceIdentifier}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {resource.region ?? 'global'}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {resource.awsAccount?.accountName}
+                          </p>
+
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {resource.awsAccount?.awsAccountId}
+                          </p>
+                        </div>
+                      </TableCell>
                       <TableCell>{resource.environment ?? '-'}</TableCell>
+                      <TableCell>
+                        <RemoveResourceFromProjectForm
+                          projectId={projectId}
+                          resourceId={resource.id}
+                          resourceName={
+                            resource.resourceName ?? resource.resourceIdentifier
+                          }
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -478,7 +572,17 @@ export default async function ProjectDetailPage({
         </TabsPanel>
 
         <TabsPanel value="members">
-          <Card className="p-6">
+          <Card className="p-6 w-200 ml-70">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground">
+                Members
+              </h2>
+              <AddMemberToProjectForm
+                projectId={project.id}
+                users={users}
+                existingMemberUserIds={existingMemberUserIds}
+              />
+            </div>
             {members.length === 0 ? (
               <p className="text-sm text-muted-foreground">No members yet.</p>
             ) : (
@@ -491,14 +595,13 @@ export default async function ProjectDetailPage({
                       key={member.id}
                       className="flex items-center justify-between gap-3"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-12">
                         <Avatar>
                           <AvatarFallback>
                             {member.user.firstName.charAt(0)}
                             {member.user.lastName.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
-
                         <div>
                           <p className="text-sm font-medium text-foreground">
                             {member.user.firstName} {member.user.lastName}
@@ -507,9 +610,13 @@ export default async function ProjectDetailPage({
                             {member.user.email}
                           </p>
                         </div>
+                        <Badge className={role.className}>{role.label}</Badge>
                       </div>
-
-                      <Badge className={role.className}>{role.label}</Badge>
+                      <RemoveMemberFromProjectForm
+                        projectId={project.id}
+                        userId={member.user.id}
+                        memberName={`${member.user.firstName} ${member.user.lastName}`}
+                      />
                     </div>
                   );
                 })}

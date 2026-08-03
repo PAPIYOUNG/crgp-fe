@@ -1,7 +1,14 @@
-import { EditPassword, EditProfile } from '@/lib/api/api-type';
+import {
+  EditPassword,
+  EditProfile,
+  GetAllUsersResponse,
+} from '@/lib/api/api-type';
 import { authFetch } from '@/lib/api/auth-fetch';
 
 export const userApi = {
+  async getAllUsers(): Promise<GetAllUsersResponse> {
+    return authFetch<GetAllUsersResponse>('/user');
+  },
   async uploadAvatar(file: File) {
     const formData = new FormData();
     formData.append('avatar', file);

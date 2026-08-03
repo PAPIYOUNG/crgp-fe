@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/table';
 
 import CloudResourceForm from '@/components/feature/cloud-resource/CloudResourceForm';
-import { cloudResourceApi } from '@/lib/api/cloud-resource.api';
+import { cloudResourceApi } from '@/lib/api/project-cloudresource.api';
 import { projectApi } from '@/lib/api/project.api';
 import { cn } from '@/lib/utils';
 
@@ -283,10 +283,6 @@ export default async function CloudResourceListPage({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <RefreshCw />
-            Sync
-          </Button>
           <CloudResourceForm />
         </div>
       </div>
