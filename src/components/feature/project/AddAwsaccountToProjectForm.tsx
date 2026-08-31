@@ -27,28 +27,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import type { AwsAccountResponse } from '@/lib/api/api-type';
+import type { AvailableAwsAccountResponse } from '@/lib/api/api-type';
 import { addAwsAccountToProjectAction } from '@/lib/action/project-awsaccount.action';
 
 type AddAwsAccountToProjectFormProps = {
   projectId: string;
-  awsAccounts: AwsAccountResponse[];
-  linkedAwsAccountIds?: string[];
+  availableAwsAccounts: AvailableAwsAccountResponse[];
 };
 
 export default function AddAwsAccountToProjectForm({
   projectId,
-  awsAccounts,
-  linkedAwsAccountIds = [],
+  availableAwsAccounts,
 }: AddAwsAccountToProjectFormProps) {
   const [open, setOpen] = useState(false);
   const [selectedAwsAccountId, setSelectedAwsAccountId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const availableAwsAccounts = awsAccounts.filter(
-    (account) => !linkedAwsAccountIds.includes(account.id),
-  );
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);

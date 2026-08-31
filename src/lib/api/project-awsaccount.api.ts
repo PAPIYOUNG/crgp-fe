@@ -1,6 +1,15 @@
+import type { GetAvailableAwsAccountsResponse } from '@/lib/api/api-type';
 import { authFetch } from '@/lib/api/auth-fetch';
 
 export const ProjectAwsAccountApi = {
+  async getAvailableAwsAccounts(
+    projectId: string,
+  ): Promise<GetAvailableAwsAccountsResponse> {
+    return authFetch<GetAvailableAwsAccountsResponse>(
+      `/project/${projectId}/aws-account/available`,
+    );
+  },
+
   async linkAwsAccountToProject(projectId: string, awsAccountId: string) {
     return authFetch(`/project/${projectId}/aws-account`, {
       method: 'POST',

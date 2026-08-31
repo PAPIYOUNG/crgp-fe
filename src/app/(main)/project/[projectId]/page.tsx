@@ -29,6 +29,7 @@ import { projectApi } from '@/lib/api/project.api';
 import { cn } from '@/lib/utils';
 import AddAwsAccountToProjectForm from '@/components/feature/project/AddAwsaccountToProjectForm';
 import { AwsAccountApi } from '@/lib/api/aws-account.api';
+import { ProjectAwsAccountApi } from '@/lib/api/project-awsaccount.api';
 import AddCloudResourceForm from '@/components/feature/cloud-resource/AddCloudResourceForm';
 import RemoveResourceFromProjectForm from '@/components/feature/cloud-resource/RemoveResourceFromProjectForm';
 import AddMemberToProjectForm from '@/components/feature/member/AddMemberToProjectForm';
@@ -145,18 +146,47 @@ export default async function ProjectDetailPage({
 }) {
   const { projectId } = await params;
 
-  const [project, awsAccountsResponse, usersResponse] = await Promise.all([
-    projectApi.getOneProject(projectId),
-    AwsAccountApi.getAwsAccountList(),
-    userApi.getAllUsers(),
-  ]).catch((error: unknown) => {
+  let project;
+  let awsAccountsResponse;
+  let usersResponse;
+  let availableAwsAccountsResponse;
+
+  try {
+    project = await projectApi.getOneProject(projectId);
+    console.log('1. projectApi.getOneProject: OK');
+
+    awsAccountsResponse = await AwsAccountApi.getAwsAccountList();
+    console.log('2. AwsAccountApi.getAwsAccountList: OK');
+
+    usersResponse = await userApi.getOptionUsers();
+    console.log('3. userApi.getOptionUsers: OK');
+
+    availableAwsAccountsResponse =
+      await ProjectAwsAccountApi.getAvailableAwsAccounts(projectId);
+    console.log('4. ProjectAwsAccountApi.getAvailableAwsAccounts: OK');
+  } catch (error: unknown) {
+    console.error('Project detail API error:', error);
+
     if (error instanceof ApiError && error.status === 404) {
       notFound();
     }
 
     throw error;
-  });
+  }
+
+  // const [project, awsAccountsResponse, usersResponse] = await Promise.all([
+  //   projectApi.getOneProject(projectId),
+  //   AwsAccountApi.getAwsAccountList(),
+  //   userApi.getAllUsers(),
+  // ]).catch((error: unknown) => {
+  //   if (error instanceof ApiError && error.status === 404) {
+  //     notFound();
+  //   }
+
+  //   throw error;
+  // });
   const awsAccounts = awsAccountsResponse.items;
+  const availableAwsAccounts = availableAwsAccountsResponse.data;
   const users = usersResponse;
 
   const resources = project.resources ?? [];
@@ -166,8 +196,6 @@ export default async function ProjectDetailPage({
   const status = statusConfig[project.status];
 
   const projectAwsAccounts = project.awsAccounts ?? [];
-
-  const linkedAwsAccountIds = projectAwsAccounts.map((account) => account.id);
 
   const counts = {
     members: project.stats.membersCount,
@@ -234,8 +262,7 @@ export default async function ProjectDetailPage({
           <EditProjectForm project={project} />
           <AddAwsAccountToProjectForm
             projectId={project.id}
-            awsAccounts={awsAccounts}
-            linkedAwsAccountIds={linkedAwsAccountIds}
+            availableAwsAccounts={availableAwsAccounts}
           />
           <AddCloudResourceForm
             projectId={project.id}
@@ -339,8 +366,7 @@ export default async function ProjectDetailPage({
                   </h2>
                   <AddAwsAccountToProjectForm
                     projectId={project.id}
-                    awsAccounts={awsAccounts}
-                    linkedAwsAccountIds={linkedAwsAccountIds}
+                    availableAwsAccounts={availableAwsAccounts}
                   />
                 </div>
 

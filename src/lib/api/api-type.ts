@@ -440,6 +440,18 @@ export type GetAwsAccountsResponse = {
   totalPages: number;
 };
 
+export type AvailableAwsAccountResponse = {
+  id: string;
+  awsAccountId: string;
+  accountName: string;
+  ownerDepartment: Department;
+  defaultRegion: string;
+};
+
+export type GetAvailableAwsAccountsResponse = {
+  data: AvailableAwsAccountResponse[];
+};
+
 export type CreateAwsAccountRequest = {
   accountName: string;
   awsAccountId: string;
@@ -538,3 +550,14 @@ export type SyncAllAwsResponse = {
     cost: SyncCostResult;
   };
 };
+
+export type UserOptionResponse = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  avatarUrl: string | null;
+  department: Department;
+};
+
+export type GetOptionUsersResponse = UserOptionResponse[];

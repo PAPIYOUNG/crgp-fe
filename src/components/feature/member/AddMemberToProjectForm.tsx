@@ -294,3 +294,10 @@ export default function AddMemberToProjectForm({
     </Dialog>
   );
 }
+
+const ROLE = {
+  ADMIN: 'ADMIN',
+} as const;
+type Role = (typeof ROLE)[keyof typeof ROLE];
+
+const user: Role = ROLE.ADMIN;
