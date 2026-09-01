@@ -4,7 +4,10 @@ import { revalidatePath } from 'next/cache';
 
 import { ApiError } from '@/lib/api/api-error';
 import { projectMemberApi } from '@/lib/api/project-member.api';
-import type { AddProjectMemberRequest } from '@/lib/api/api-type';
+import type {
+  AddProjectMemberRequest,
+  UpdateProjectMemberRoleRequest,
+} from '@/lib/api/api-type';
 
 export async function addProjectMemberAction(
   projectId: string,
@@ -24,7 +27,11 @@ export async function addProjectMemberAction(
     };
   }
 
-  if (input.memberRole !== 'MEMBER' && input.memberRole !== 'TECHNICAL_OWNER') {
+  if (
+    input.memberRole !== 'MEMBER' &&
+    input.memberRole !== 'TECHNICAL_OWNER' &&
+    input.memberRole !== 'BUSINESS_OWNER'
+  ) {
     return {
       success: false as const,
       message: 'Please select a valid project role.',
@@ -33,6 +40,59 @@ export async function addProjectMemberAction(
 
   try {
     await projectMemberApi.addProjectMember(projectId, input);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return {
+        success: false as const,
+        status: error.status,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    throw error;
+  }
+
+  revalidatePath(`/project/${projectId}`);
+  revalidatePath('/project');
+
+  return {
+    success: true as const,
+  };
+}
+
+export async function updateProjectMemberRoleAction(
+  projectId: string,
+  userId: string,
+  input: UpdateProjectMemberRoleRequest,
+) {
+  if (!projectId) {
+    return {
+      success: false as const,
+      message: 'Project ID is required.',
+    };
+  }
+
+  if (!userId) {
+    return {
+      success: false as const,
+      message: 'Please select a user.',
+    };
+  }
+
+  if (
+    input.memberRole !== 'MEMBER' &&
+    input.memberRole !== 'TECHNICAL_OWNER' &&
+    input.memberRole !== 'BUSINESS_OWNER'
+  ) {
+    return {
+      success: false as const,
+      message: 'Please select a valid project role.',
+    };
+  }
+
+  try {
+    await projectMemberApi.updateMemberRole(projectId, userId, input);
   } catch (error) {
     if (error instanceof ApiError) {
       return {

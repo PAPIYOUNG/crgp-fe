@@ -36,6 +36,7 @@ import AddMemberToProjectForm from '@/components/feature/member/AddMemberToProje
 import { userApi } from '@/lib/api/user.api';
 import RemoveMemberFromProjectForm from '@/components/feature/member/RemoveMemberFromProjectForm';
 import RemoveAwsaccountFromProjectForm from '@/components/feature/project/RemoveAwsaccountFromProjectForm';
+import EditMemberRoleToProjectForm from '@/components/feature/member/EditMemberRoleToProjectForm';
 
 export const metadata: Metadata = {
   title: 'Project',
@@ -510,6 +511,14 @@ export default async function ProjectDetailPage({
                             <Badge className={role.className}>
                               {role.label}
                             </Badge>
+                            {member.memberRole !== 'BUSINESS_OWNER' && (
+                              <EditMemberRoleToProjectForm
+                                projectId={project.id}
+                                userId={member.user.id}
+                                memberName={`${member.user.firstName} ${member.user.lastName}`}
+                                currentRole={member.memberRole}
+                              />
+                            )}
                             <RemoveMemberFromProjectForm
                               projectId={project.id}
                               userId={member.user.id}
@@ -638,11 +647,19 @@ export default async function ProjectDetailPage({
                         </div>
                         <Badge className={role.className}>{role.label}</Badge>
                       </div>
-                      <RemoveMemberFromProjectForm
-                        projectId={project.id}
-                        userId={member.user.id}
-                        memberName={`${member.user.firstName} ${member.user.lastName}`}
-                      />
+                      <div>
+                        <EditMemberRoleToProjectForm
+                          projectId={project.id}
+                          userId={member.user.id}
+                          memberName={`${member.user.firstName} ${member.user.lastName}`}
+                          currentRole={member.memberRole}
+                        />
+                        <RemoveMemberFromProjectForm
+                          projectId={project.id}
+                          userId={member.user.id}
+                          memberName={`${member.user.firstName} ${member.user.lastName}`}
+                        />
+                      </div>
                     </div>
                   );
                 })}

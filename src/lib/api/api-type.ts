@@ -489,7 +489,10 @@ export type VerifyAwsAccountResponse = {
 //Member project
 export type AddProjectMemberRequest = {
   userId: string;
-  memberRole: 'MEMBER' | 'TECHNICAL_OWNER';
+  memberRole: ProjectMemberRole;
+};
+export type UpdateProjectMemberRoleRequest = {
+  memberRole: ProjectMemberRole;
 };
 export type UserOption = {
   id: string;
