@@ -25,6 +25,7 @@ import type {
   SortOrder,
 } from '@/lib/api/api-type';
 
+import { AwsAccountApi } from '@/lib/api/aws-account.api';
 import { cloudResourceApi } from '@/lib/api/project-cloudresource.api';
 import { cn } from '@/lib/utils';
 import { CloudResourceSearchParams } from '@/app/(main)/cloud-resources/page';
@@ -89,6 +90,14 @@ const serviceStats = [
   },
 ] as const;
 
+const providerLabels: Record<string, string> = {
+  AWS: 'AWS',
+  AZURE: 'Azure',
+  GCP: 'Google Cloud',
+  ON_PREM: 'On-Premises',
+  OTHER: 'Other',
+};
+
 const serviceLabels: Record<string, string> = {
   EC2: 'EC2',
   RDS: 'RDS',
@@ -132,6 +141,13 @@ const serviceBadgeStyles: Record<string, string> = {
 
   ATHENA:
     'border-cyan-200 text-cyan-700 dark:border-cyan-500/30 dark:text-cyan-400',
+
+  LOAD_BALANCER:
+    'border-cyan-200 text-cyan-700 dark:border-cyan-500/30 dark:text-cyan-400',
+
+  WAF: 'border-red-200 text-red-700 dark:border-red-500/30 dark:text-red-400',
+
+  CDN: 'border-violet-200 text-violet-700 dark:border-violet-500/30 dark:text-violet-400',
 };
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -207,6 +223,21 @@ function getStatCategory(resourceType: string) {
 }
 
 function getServiceDisplay(resourceType: string) {
+  const category = getStatCategory(resourceType);
+
+  const categoryLabel = serviceStats.find(
+    (stat) => stat.key === category,
+  )?.label;
+
+  if (category !== 'OTHER' && categoryLabel) {
+    return {
+      label: categoryLabel,
+
+      className:
+        serviceBadgeStyles[category] ?? 'border-border text-muted-foreground',
+    };
+  }
+
   const segment = getServiceSegment(resourceType);
 
   return {
@@ -317,9 +348,20 @@ export default async function CloudResourceListPage({
     order: (params.order as SortOrder | undefined) ?? 'desc',
   };
 
-  const response = await cloudResourceApi.getCloudResourceList(query);
+  const [response, awsAccountsResponse] = await Promise.all([
+    cloudResourceApi.getCloudResourceList(query),
+    AwsAccountApi.getAwsAccountList(),
+  ]);
 
   const resources = response.items;
+
+  const awsAccounts = awsAccountsResponse.items
+    .filter((account) => account.isActive)
+    .map((account) => ({
+      id: account.id,
+      awsAccountId: account.awsAccountId,
+      accountName: account.accountName,
+    }));
 
   const {
     page: currentPage,
@@ -357,7 +399,7 @@ export default async function CloudResourceListPage({
           </p>
         </div>
 
-        <CloudResourceForm />
+        <CloudResourceForm awsAccounts={awsAccounts} />
       </div>
 
       {/* Summary cards */}
@@ -450,7 +492,9 @@ export default async function CloudResourceListPage({
                         </span>
 
                         <span className="text-xs text-muted-foreground">
-                          {resource.awsAccount.accountName}
+                          {resource.awsAccount?.accountName ??
+                            (providerLabels[resource.provider] ??
+                              resource.provider)}
                         </span>
                       </div>
                     </TableCell>

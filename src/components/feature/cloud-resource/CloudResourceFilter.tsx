@@ -84,6 +84,13 @@ const resourceTypeOptions = [
 
 const environmentOptions = ['DEV', 'UAT', 'STAGING', 'PRODUCTION'] as const;
 
+const regionOptions = [
+  { value: 'us-east-1', label: 'us-east-1' },
+  { value: 'us-west-2', label: 'us-west-2' },
+  { value: 'ap-southeast-1', label: 'ap-southeast-1' },
+  { value: 'global', label: 'global' },
+] as const;
+
 const sourceOptions = [
   {
     value: 'AWS_CONFIG',
@@ -126,6 +133,37 @@ const sortOptions = [
   },
 ] as const;
 
+const resourceTypeItems: Record<string, string> = {
+  [ALL_VALUE]: 'All resource types',
+  ...Object.fromEntries(
+    resourceTypeOptions.map((option) => [option.value, option.label]),
+  ),
+};
+
+const regionItems: Record<string, string> = {
+  [ALL_VALUE]: 'All regions',
+  ...Object.fromEntries(regionOptions.map((option) => [option.value, option.label])),
+};
+
+const sourceItems: Record<string, string> = {
+  [ALL_VALUE]: 'All sources',
+  ...Object.fromEntries(sourceOptions.map((option) => [option.value, option.label])),
+};
+
+const environmentItems: Record<string, string> = {
+  [ALL_VALUE]: 'All environments',
+  ...Object.fromEntries(environmentOptions.map((value) => [value, value])),
+};
+
+const assignmentItems: Record<string, string> = {
+  [ALL_VALUE]: 'All assignments',
+  UNASSIGNED: 'Unassigned only',
+};
+
+const sortItems: Record<string, string> = Object.fromEntries(
+  sortOptions.map((option) => [option.value, option.label]),
+);
+
 export function CloudResourceFilters() {
   const router = useRouter();
   const pathname = usePathname();
@@ -135,19 +173,11 @@ export function CloudResourceFilters() {
 
   const searchFromUrl = searchParams.get('search') ?? '';
 
-  const regionFromUrl = searchParams.get('region') ?? '';
-
   const [search, setSearch] = useState(searchFromUrl);
-
-  const [region, setRegion] = useState(regionFromUrl);
 
   useEffect(() => {
     setSearch(searchFromUrl);
   }, [searchFromUrl]);
-
-  useEffect(() => {
-    setRegion(regionFromUrl);
-  }, [regionFromUrl]);
 
   function updateSearchParams(values: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -175,7 +205,6 @@ export function CloudResourceFilters() {
 
     updateSearchParams({
       search: search.trim() || null,
-      region: region.trim() || null,
     });
   }
 
@@ -190,7 +219,6 @@ export function CloudResourceFilters() {
 
   function handleReset() {
     setSearch('');
-    setRegion('');
 
     startTransition(() => {
       router.replace(pathname);
@@ -198,6 +226,8 @@ export function CloudResourceFilters() {
   }
 
   const resourceType = searchParams.get('resourceType') ?? ALL_VALUE;
+
+  const region = searchParams.get('region') ?? ALL_VALUE;
 
   const source = searchParams.get('source') ?? ALL_VALUE;
 
@@ -242,21 +272,21 @@ export function CloudResourceFilters() {
             />
           </div>
 
-          <Input
-            value={region}
-            onChange={(event) => setRegion(event.target.value)}
-            placeholder="Region, e.g. ap-southeast-1"
-            className="w-full sm:w-56"
-            disabled={isPending}
-          />
-
           <Button type="submit" variant="outline" disabled={isPending}>
             <Search className="size-4" />
             Search
           </Button>
         </form>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <SlidersHorizontal className="size-4" />
+          Filters
+        </div>
 
         <Select
+          items={resourceTypeItems}
           value={resourceType}
           onValueChange={(value) =>
             updateSearchParams({
@@ -281,31 +311,32 @@ export function CloudResourceFilters() {
         </Select>
 
         <Select
-          value={sortValue}
-          onValueChange={handleSortChange}
+          items={regionItems}
+          value={region}
+          onValueChange={(value) =>
+            updateSearchParams({
+              region: value === ALL_VALUE ? null : value,
+            })
+          }
           disabled={isPending}
         >
-          <SelectTrigger className="w-full xl:w-52">
-            <SelectValue placeholder="Sort resources" />
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue placeholder="All regions" />
           </SelectTrigger>
 
           <SelectContent>
-            {sortOptions.map((option) => (
+            <SelectItem value={ALL_VALUE}>All regions</SelectItem>
+
+            {regionOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <SlidersHorizontal className="size-4" />
-          Filters
-        </div>
 
         <Select
+          items={sourceItems}
           value={source}
           onValueChange={(value) =>
             updateSearchParams({
@@ -330,6 +361,7 @@ export function CloudResourceFilters() {
         </Select>
 
         <Select
+          items={environmentItems}
           value={environment}
           onValueChange={(value) =>
             updateSearchParams({
@@ -354,6 +386,7 @@ export function CloudResourceFilters() {
         </Select>
 
         <Select
+          items={assignmentItems}
           value={assignment}
           onValueChange={(value) =>
             updateSearchParams({
@@ -374,6 +407,24 @@ export function CloudResourceFilters() {
           </SelectContent>
         </Select>
 
+        <Select
+          items={sortItems}
+          value={sortValue}
+          onValueChange={handleSortChange}
+          disabled={isPending}
+        >
+          <SelectTrigger className="w-full xl:w-52">
+            <SelectValue placeholder="Sort resources" />
+          </SelectTrigger>
+
+          <SelectContent>
+            {sortOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {hasFilters && (
           <Button
             type="button"
