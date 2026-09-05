@@ -274,6 +274,12 @@ export type CloudResourceAwsAccount = {
   accountName: string;
 };
 
+export type CloudResourceProject = {
+  id: string;
+  projectName: string;
+  projectCode: string;
+};
+
 export type CloudResourceResponse = {
   id: string;
   awsAccountId: string | null;
@@ -306,6 +312,7 @@ export type CloudResourceResponse = {
   updatedAt: string;
 
   awsAccount: CloudResourceAwsAccount | null;
+  project: CloudResourceProject | null;
 };
 
 export type CloudResourcePagination = {

@@ -1,13 +1,10 @@
 import { Download, MapPin } from 'lucide-react';
-
 import CloudResourceForm from '@/components/feature/cloud-resource/CloudResourceForm';
-
+import { CloudResourceDetailDialog } from '@/components/feature/cloud-resource/CloudResourceDetailDialog';
 import { CloudResourcePagination } from '@/components/feature/cloud-resource/CloudResourcePagination';
-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-
 import {
   Table,
   TableBody,
@@ -24,10 +21,17 @@ import type {
   ResourceSource,
   SortOrder,
 } from '@/lib/api/api-type';
-
 import { AwsAccountApi } from '@/lib/api/aws-account.api';
 import { cloudResourceApi } from '@/lib/api/project-cloudresource.api';
+import { projectApi } from '@/lib/api/project.api';
 import { cn } from '@/lib/utils';
+import {
+  getServiceDisplay,
+  getSourceDisplay,
+  getStatusStyle,
+  providerLabels,
+  serviceStats,
+} from '@/lib/utils/cloud-resource-display';
 import { CloudResourceSearchParams } from '@/app/(main)/cloud-resources/page';
 import { CloudResourceFilters } from '@/components/feature/cloud-resource/CloudResourceFilter';
 
@@ -35,119 +39,6 @@ const PAGE_SIZE = 8;
 
 type CloudResourceListPageProps = {
   searchParams: CloudResourceSearchParams;
-};
-
-const serviceStats = [
-  {
-    key: 'EC2',
-    label: 'EC2',
-    className: 'text-orange-600 dark:text-orange-400',
-  },
-  {
-    key: 'RDS',
-    label: 'RDS',
-    className: 'text-blue-600 dark:text-blue-400',
-  },
-  {
-    key: 'S3',
-    label: 'S3',
-    className: 'text-green-600 dark:text-green-400',
-  },
-  {
-    key: 'LAMBDA',
-    label: 'Lambda',
-    className: 'text-orange-600 dark:text-orange-400',
-  },
-  {
-    key: 'EKS',
-    label: 'EKS',
-    className: 'text-indigo-600 dark:text-indigo-400',
-  },
-  {
-    key: 'LOAD_BALANCER',
-    label: 'Load Balancer',
-    className: 'text-cyan-600 dark:text-cyan-400',
-  },
-  {
-    key: 'WAF',
-    label: 'WAF',
-    className: 'text-red-600 dark:text-red-400',
-  },
-  {
-    key: 'CDN',
-    label: 'CDN',
-    className: 'text-violet-600 dark:text-violet-400',
-  },
-  {
-    key: 'NETWORKING',
-    label: 'Networking',
-    className: 'text-purple-600 dark:text-purple-400',
-  },
-  {
-    key: 'OTHER',
-    label: 'Other',
-    className: 'text-foreground',
-  },
-] as const;
-
-const providerLabels: Record<string, string> = {
-  AWS: 'AWS',
-  AZURE: 'Azure',
-  GCP: 'Google Cloud',
-  ON_PREM: 'On-Premises',
-  OTHER: 'Other',
-};
-
-const serviceLabels: Record<string, string> = {
-  EC2: 'EC2',
-  RDS: 'RDS',
-  S3: 'S3',
-  LAMBDA: 'Lambda',
-  EKS: 'EKS',
-  NETWORKING: 'Networking',
-  ELASTICLOADBALANCING: 'Load Balancer',
-  ELASTICLOADBALANCINGV2: 'Load Balancer',
-  WAF: 'WAF',
-  WAFV2: 'WAF',
-  CLOUDFRONT: 'CloudFront',
-  ROUTE53RESOLVER: 'Route53 Resolver',
-  CASSANDRA: 'Cassandra',
-  KMS: 'KMS',
-  IAM: 'IAM',
-  ATHENA: 'Athena',
-};
-
-const serviceBadgeStyles: Record<string, string> = {
-  EC2: 'border-orange-200 text-orange-700 dark:border-orange-500/30 dark:text-orange-400',
-
-  RDS: 'border-blue-200 text-blue-700 dark:border-blue-500/30 dark:text-blue-400',
-
-  S3: 'border-green-200 text-green-700 dark:border-green-500/30 dark:text-green-400',
-
-  LAMBDA:
-    'border-orange-200 text-orange-700 dark:border-orange-500/30 dark:text-orange-400',
-
-  EKS: 'border-indigo-200 text-indigo-700 dark:border-indigo-500/30 dark:text-indigo-400',
-
-  NETWORKING:
-    'border-purple-200 text-purple-700 dark:border-purple-500/30 dark:text-purple-400',
-
-  CASSANDRA:
-    'border-violet-200 text-violet-700 dark:border-violet-500/30 dark:text-violet-400',
-
-  KMS: 'border-blue-200 text-blue-700 dark:border-blue-500/30 dark:text-blue-400',
-
-  IAM: 'border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-400',
-
-  ATHENA:
-    'border-cyan-200 text-cyan-700 dark:border-cyan-500/30 dark:text-cyan-400',
-
-  LOAD_BALANCER:
-    'border-cyan-200 text-cyan-700 dark:border-cyan-500/30 dark:text-cyan-400',
-
-  WAF: 'border-red-200 text-red-700 dark:border-red-500/30 dark:text-red-400',
-
-  CDN: 'border-violet-200 text-violet-700 dark:border-violet-500/30 dark:text-violet-400',
 };
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -170,126 +61,6 @@ function parseBoolean(value: string | undefined) {
   }
 
   return undefined;
-}
-
-function getServiceSegment(resourceType: string) {
-  return resourceType.split('::')[1]?.toUpperCase() ?? 'OTHER';
-}
-
-function getStatCategory(resourceType: string) {
-  switch (resourceType) {
-    case 'AWS::EC2::Instance':
-      return 'EC2';
-
-    case 'AWS::RDS::DBInstance':
-    case 'AWS::RDS::DBCluster':
-      return 'RDS';
-
-    case 'AWS::S3::Bucket':
-      return 'S3';
-
-    case 'AWS::Lambda::Function':
-      return 'LAMBDA';
-
-    case 'AWS::EKS::Cluster':
-      return 'EKS';
-
-    case 'AWS::ElasticLoadBalancing::LoadBalancer':
-    case 'AWS::ElasticLoadBalancingV2::LoadBalancer':
-      return 'LOAD_BALANCER';
-
-    case 'AWS::WAF::WebACL':
-    case 'AWS::WAFv2::WebACL':
-      return 'WAF';
-
-    case 'AWS::CloudFront::Distribution':
-      return 'CDN';
-
-    case 'AWS::EC2::RouteTable':
-    case 'AWS::EC2::NetworkAcl':
-    case 'AWS::EC2::SecurityGroup':
-    case 'AWS::EC2::Subnet':
-    case 'AWS::EC2::VPC':
-    case 'AWS::EC2::InternetGateway':
-    case 'AWS::EC2::NatGateway':
-    case 'AWS::EC2::SubnetRouteTableAssociation':
-    case 'AWS::Route53Resolver::ResolverRule':
-    case 'AWS::Route53Resolver::ResolverRuleAssociation':
-      return 'NETWORKING';
-
-    default:
-      return 'OTHER';
-  }
-}
-
-function getServiceDisplay(resourceType: string) {
-  const category = getStatCategory(resourceType);
-
-  const categoryLabel = serviceStats.find(
-    (stat) => stat.key === category,
-  )?.label;
-
-  if (category !== 'OTHER' && categoryLabel) {
-    return {
-      label: categoryLabel,
-
-      className:
-        serviceBadgeStyles[category] ?? 'border-border text-muted-foreground',
-    };
-  }
-
-  const segment = getServiceSegment(resourceType);
-
-  return {
-    label: serviceLabels[segment] ?? segment,
-
-    className:
-      serviceBadgeStyles[segment] ?? 'border-border text-muted-foreground',
-  };
-}
-
-function getStatusStyle(status: string | null) {
-  const normalized = status?.toLowerCase() ?? '';
-
-  if (
-    ['running', 'available', 'active'].some((item) => normalized.includes(item))
-  ) {
-    return {
-      dot: 'bg-green-500',
-
-      className:
-        'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400',
-    };
-  }
-
-  if (
-    ['stopped', 'pending', 'stopping'].some((item) => normalized.includes(item))
-  ) {
-    return {
-      dot: 'bg-amber-500',
-
-      className:
-        'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-    };
-  }
-
-  if (
-    ['terminated', 'error', 'failed', 'deleted'].some((item) =>
-      normalized.includes(item),
-    )
-  ) {
-    return {
-      dot: 'bg-red-500',
-
-      className: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400',
-    };
-  }
-
-  return {
-    dot: 'bg-muted-foreground',
-
-    className: 'bg-muted text-muted-foreground',
-  };
 }
 
 function StatCard({
@@ -348,9 +119,10 @@ export default async function CloudResourceListPage({
     order: (params.order as SortOrder | undefined) ?? 'desc',
   };
 
-  const [response, awsAccountsResponse] = await Promise.all([
+  const [response, awsAccountsResponse, projectsResponse] = await Promise.all([
     cloudResourceApi.getCloudResourceList(query),
     AwsAccountApi.getAwsAccountList(),
+    projectApi.getProject({ limit: 100 }),
   ]);
 
   const resources = response.items;
@@ -362,6 +134,11 @@ export default async function CloudResourceListPage({
       awsAccountId: account.awsAccountId,
       accountName: account.accountName,
     }));
+
+  const projects = projectsResponse.items.map((project) => ({
+    id: project.id,
+    projectName: project.projectName,
+  }));
 
   const {
     page: currentPage,
@@ -442,6 +219,18 @@ export default async function CloudResourceListPage({
               </TableHead>
 
               <TableHead className="h-11 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Cloud-Sync/Manual
+              </TableHead>
+
+              <TableHead className="h-11 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Cloud-Account
+              </TableHead>
+
+              <TableHead className="h-11 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Project
+              </TableHead>
+
+              <TableHead className="h-11 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 Service
               </TableHead>
 
@@ -451,10 +240,6 @@ export default async function CloudResourceListPage({
 
               <TableHead className="h-11 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 Region
-              </TableHead>
-
-              <TableHead className="h-11 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                Project
               </TableHead>
 
               <TableHead className="h-11 text-center text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -471,7 +256,7 @@ export default async function CloudResourceListPage({
             {pageItems.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={9}
                   className="h-32 text-center text-muted-foreground"
                 >
                   No resources match the selected filters.
@@ -481,22 +266,39 @@ export default async function CloudResourceListPage({
               pageItems.map((resource) => {
                 const service = getServiceDisplay(resource.resourceType);
 
+                const source = getSourceDisplay(resource.source);
+
                 const status = getStatusStyle(resource.resourceStatus);
 
                 return (
                   <TableRow key={resource.id}>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-mono text-sm font-medium text-foreground">
-                          {resource.resourceName ?? resource.resourceIdentifier}
-                        </span>
+                      <CloudResourceDetailDialog
+                        resource={resource}
+                        projects={projects}
+                      />
+                    </TableCell>
 
-                        <span className="text-xs text-muted-foreground">
-                          {resource.awsAccount?.accountName ??
-                            (providerLabels[resource.provider] ??
-                              resource.provider)}
+                    <TableCell>
+                      <Badge className={cn('gap-1.5', source.className)}>
+                        {source.label}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell className="text-sm text-foreground">
+                      {resource.awsAccount?.accountName ??
+                        providerLabels[resource.provider] ??
+                        resource.provider}
+                    </TableCell>
+
+                    <TableCell className="text-sm text-foreground">
+                      {resource.project ? (
+                        resource.project.projectName
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Unassigned
                         </span>
-                      </div>
+                      )}
                     </TableCell>
 
                     <TableCell>
@@ -515,10 +317,6 @@ export default async function CloudResourceListPage({
 
                         {resource.region ?? 'Global'}
                       </span>
-                    </TableCell>
-
-                    <TableCell className="text-sm text-foreground">
-                      {resource.projectId ? 'Assigned' : 'Unassigned'}
                     </TableCell>
 
                     <TableCell className="text-center">

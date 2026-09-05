@@ -4,19 +4,48 @@ import { revalidatePath } from 'next/cache';
 
 import { CloudResourceInput } from '@/components/feature/cloud-resource/CloudResourceForm';
 import { ApiError } from '@/lib/api/api-error';
-import { CreateCloudResourceRequest } from '@/lib/api/api-type';
+import {
+  CloudResourceUpdateRequest,
+  CreateCloudResourceRequest,
+} from '@/lib/api/api-type';
 import { cloudResourceApi } from '@/lib/api/project-cloudresource.api';
+import {
+  ENVIRONMENT_TO_BACKEND,
+  UpdateResourceManualInput,
+} from '@/lib/action/cloud-resource.constants';
 
-// ฟอร์มยังใช้ค่า Environment แบบเดิม (PRODUCTION) แต่ backend อ้างอิง Prisma enum (PROD)
-const ENVIRONMENT_TO_BACKEND: Record<
-  string,
-  CreateCloudResourceRequest['environment']
-> = {
-  DEV: 'DEV',
-  UAT: 'UAT',
-  STAGING: 'STAGING',
-  PRODUCTION: 'PROD',
-};
+export async function UpdateResourceManual(
+  resourceId: string,
+  input: UpdateResourceManualInput,
+) {
+  try {
+    const payload: CloudResourceUpdateRequest = {
+      projectId: input.projectId || null,
+      environment: input.environment
+        ? (ENVIRONMENT_TO_BACKEND[input.environment] as CloudResourceUpdateRequest['environment'])
+        : null,
+      description: input.description?.trim() || null,
+    };
+
+    await cloudResourceApi.editCloudResource(resourceId, payload);
+
+    revalidatePath('/cloud-resources');
+
+    return {
+      success: true as const,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return {
+        success: false as const,
+        status: error.status,
+        message: error.message,
+      };
+    }
+
+    throw error;
+  }
+}
 
 export async function CreateResourceManual(input: CloudResourceInput) {
   try {
