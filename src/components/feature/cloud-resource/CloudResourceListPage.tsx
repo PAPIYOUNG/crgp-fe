@@ -63,6 +63,29 @@ function parseBoolean(value: string | undefined) {
   return undefined;
 }
 
+// Manual resources store their monthly cost inside `configuration.monthlyCost`
+// (set on CloudResourceForm); AWS-synced resources have no per-resource cost yet.
+function getMonthlyCost(
+  configuration: Record<string, unknown> | null,
+): number | null {
+  const value = configuration?.monthlyCost;
+
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return null;
+  }
+
+  const amount = Number(value);
+
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function formatMoney(amount: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+}
+
 function StatCard({
   label,
   value,
@@ -270,6 +293,8 @@ export default async function CloudResourceListPage({
 
                 const status = getStatusStyle(resource.resourceStatus);
 
+                const monthlyCost = getMonthlyCost(resource.configuration);
+
                 return (
                   <TableRow key={resource.id}>
                     <TableCell>
@@ -329,8 +354,12 @@ export default async function CloudResourceListPage({
                       </Badge>
                     </TableCell>
 
-                    <TableCell className="text-sm text-muted-foreground">
-                      —
+                    <TableCell className="text-sm text-foreground">
+                      {monthlyCost !== null ? (
+                        formatMoney(monthlyCost)
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
