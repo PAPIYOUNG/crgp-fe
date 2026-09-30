@@ -280,6 +280,20 @@ export type CloudResourceProject = {
   projectCode: string;
 };
 
+export type CloudResourceTag = {
+  tagKey: string;
+  tagValue: string | null;
+};
+
+export type CloudResourceTagCompliance = {
+  isCompliant: boolean;
+  requiredTagsFound: number;
+  requiredTagsTotal: number;
+  compliancePercentage: number;
+  missingTags: string[];
+  invalidTags: string[];
+};
+
 export type CloudResourceResponse = {
   id: string;
   awsAccountId: string | null;
@@ -313,6 +327,9 @@ export type CloudResourceResponse = {
 
   awsAccount: CloudResourceAwsAccount | null;
   project: CloudResourceProject | null;
+
+  tags: CloudResourceTag[];
+  tagCompliance: CloudResourceTagCompliance;
 };
 
 export type CloudResourcePagination = {

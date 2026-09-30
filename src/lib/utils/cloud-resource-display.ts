@@ -205,6 +205,21 @@ export function getSourceDisplay(source: ResourceSource) {
   };
 }
 
+export function getTagComplianceStyle(isCompliant: boolean) {
+  if (isCompliant) {
+    return {
+      label: 'Compliant',
+      className:
+        'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400',
+    };
+  }
+
+  return {
+    label: 'Non-Compliant',
+    className: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400',
+  };
+}
+
 export function getStatusStyle(status: string | null) {
   const normalized = status?.toLowerCase() ?? '';
 
