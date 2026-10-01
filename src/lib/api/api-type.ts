@@ -112,7 +112,7 @@ export type CreateProjectRequest = {
   description: string | null;
   businessDepartment: Department;
   technicalDepartment: Department;
-  monthlyBudget: string | null;
+  monthlyBudget: number | null;
   budgetCurrency: string;
   startDate: string | null;
   endDate: string | null;
@@ -120,14 +120,14 @@ export type CreateProjectRequest = {
 
 export type UpdateProjectRequest = {
   projectName?: string;
-  description?: string;
+  description?: string | null;
   businessDepartment?: Department;
   technicalDepartment?: Department;
-  monthlyBudget?: number;
+  monthlyBudget?: number | null;
   budgetCurrency?: string;
   status?: ProjectStatus;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 //Filter Project
@@ -257,6 +257,7 @@ export type GetOneProjectResponse = {
 //Cloud Resource API Types
 export type ResourceSource = 'MANUAL' | 'AWS_CONFIG';
 export type Environment = 'DEV' | 'UAT' | 'STAGING' | 'PRODUCTION';
+export type ResourceProvider = 'AWS' | 'AZURE' | 'GCP' | 'ON_PREM' | 'OTHER';
 
 export type CloudResourceSortField =
   | 'resourceName'
@@ -273,9 +274,15 @@ export type CloudResourceAwsAccount = {
   accountName: string;
 };
 
+export type CloudResourceProject = {
+  id: string;
+  projectName: string;
+  projectCode: string;
+};
+
 export type CloudResourceResponse = {
   id: string;
-  awsAccountId: string;
+  awsAccountId: string | null;
   projectId: string | null;
 
   resourceIdentifier: string;
@@ -288,6 +295,7 @@ export type CloudResourceResponse = {
   resourceStatus: string | null;
 
   source: 'MANUAL' | 'AWS_CONFIG';
+  provider: ResourceProvider;
   environment: Environment | null;
 
   ownerId: string | null;
@@ -303,7 +311,8 @@ export type CloudResourceResponse = {
   createdAt: string;
   updatedAt: string;
 
-  awsAccount: CloudResourceAwsAccount;
+  awsAccount: CloudResourceAwsAccount | null;
+  project: CloudResourceProject | null;
 };
 
 export type CloudResourcePagination = {
@@ -359,6 +368,7 @@ export type GetCloudResourcesQuery = {
   region?: string;
 
   source?: ResourceSource;
+  provider?: ResourceProvider;
   environment?: Environment;
 
   isDeleted?: boolean;
@@ -372,6 +382,41 @@ export type CloudResourceUpdateRequest = {
   ownerId?: string | null;
   environment?: Environment | null;
   description?: string | null;
+};
+
+export type ManualResourceService =
+  | 'EC2'
+  | 'RDS'
+  | 'S3'
+  | 'LAMBDA'
+  | 'EKS'
+  | 'CLOUDFRONT'
+  | 'OTHER';
+
+export type ManualResourceStatus =
+  | 'RUNNING'
+  | 'STOPPED'
+  | 'PENDING'
+  | 'TERMINATED';
+
+export type CreateCloudResourceRequest = {
+  provider: ResourceProvider;
+  // จำเป็นเฉพาะตอน provider เป็น 'AWS' เท่านั้น
+  awsAccountId?: string;
+  resourceName: string;
+  service: ManualResourceService;
+  instanceType?: string;
+  region: string;
+  projectId?: string;
+  environment?: 'DEV' | 'TEST' | 'UAT' | 'STAGING' | 'PROD';
+  status?: ManualResourceStatus;
+  monthlyCost?: string;
+  description?: string;
+};
+
+export type CreateCloudResourceResponse = {
+  message: string;
+  resource: CloudResourceResponse;
 };
 
 //ผูก Cloud Resource กับ Project
@@ -440,6 +485,18 @@ export type GetAwsAccountsResponse = {
   totalPages: number;
 };
 
+export type AvailableAwsAccountResponse = {
+  id: string;
+  awsAccountId: string;
+  accountName: string;
+  ownerDepartment: Department;
+  defaultRegion: string;
+};
+
+export type GetAvailableAwsAccountsResponse = {
+  data: AvailableAwsAccountResponse[];
+};
+
 export type CreateAwsAccountRequest = {
   accountName: string;
   awsAccountId: string;
@@ -477,7 +534,10 @@ export type VerifyAwsAccountResponse = {
 //Member project
 export type AddProjectMemberRequest = {
   userId: string;
-  memberRole: 'MEMBER' | 'TECHNICAL_OWNER';
+  memberRole: ProjectMemberRole;
+};
+export type UpdateProjectMemberRoleRequest = {
+  memberRole: ProjectMemberRole;
 };
 export type UserOption = {
   id: string;
@@ -538,3 +598,15 @@ export type SyncAllAwsResponse = {
     cost: SyncCostResult;
   };
 };
+
+export type UserOptionResponse = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  avatarUrl: string | null;
+  department: Department;
+  status: 'ACTIVE' | 'INACTIVE';
+};
+
+export type GetOptionUsersResponse = UserOptionResponse[];

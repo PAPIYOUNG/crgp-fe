@@ -54,9 +54,11 @@ export async function registerAction(
   const { confirmPassword, ...registerData } = parsed.data;
   try {
     await AuthApi.register(registerData);
+    redirect('/login');
   } catch (error) {
+    console.log('error', error);
     if (error instanceof ApiError) {
-      if (error.statusCode === 409) {
+      if (error.status === 409) {
         return {
           success: false,
           message: 'Email already in use',
@@ -73,7 +75,6 @@ export async function registerAction(
 
     throw error;
   }
-  redirect('/login');
 }
 
 export async function logoutAction(): Promise<void> {

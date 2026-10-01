@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -12,26 +12,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from '@/components/ui/field';
+} from "@/components/ui/field";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 
-import type { AwsAccountResponse } from '@/lib/api/api-type';
+import type { AwsAccountResponse } from "@/lib/api/api-type";
 import {
   addResourceToProjectAction,
   getAvailableResourcesAction,
-} from '@/lib/action/project-resource.action';
+} from "@/lib/action/project-resource.action";
 
 type AwsAccountItem = {
   id: string;
@@ -55,10 +55,10 @@ export default function AddCloudResourceForm({
   projectId,
   awsAccounts = [],
 }: AddCloudResourceFormProps) {
-  console.log('awsAccounts', awsAccounts);
+  console.log("awsAccounts", awsAccounts);
   const [open, setOpen] = useState(false);
-  const [selectedAwsAccountId, setSelectedAwsAccountId] = useState('');
-  const [selectedResourceId, setSelectedResourceId] = useState('');
+  const [selectedAwsAccountId, setSelectedAwsAccountId] = useState("");
+  const [selectedResourceId, setSelectedResourceId] = useState("");
   const [resources, setResources] = useState<CloudResourceItem[]>([]);
   const [isLoadingResources, setIsLoadingResources] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,16 +72,18 @@ export default function AddCloudResourceForm({
     setErrorMessage(null);
 
     if (!nextOpen) {
-      setSelectedAwsAccountId('');
-      setSelectedResourceId('');
+      setSelectedAwsAccountId("");
+      setSelectedResourceId("");
       setResources([]);
       setErrorMessage(null);
     }
   };
 
-  const handleAccountChange = async (awsAccountId: string) => {
+  const handleAccountChange = async (awsAccountId: string | null) => {
+    if (!awsAccountId) return;
+
     setSelectedAwsAccountId(awsAccountId);
-    setSelectedResourceId('');
+    setSelectedResourceId("");
     setResources([]);
     setErrorMessage(null);
 
@@ -105,7 +107,7 @@ export default function AddCloudResourceForm({
     event.preventDefault();
 
     if (!selectedResourceId) {
-      setErrorMessage('Please select a resource.');
+      setErrorMessage("Please select a resource.");
       return;
     }
 
@@ -165,7 +167,7 @@ export default function AddCloudResourceForm({
                   <SelectValue>
                     {selectedAccount
                       ? `${selectedAccount.accountName} (${selectedAccount.awsAccountId})`
-                      : 'Select AWS Account'}
+                      : "Select AWS Account"}
                   </SelectValue>
                 </SelectTrigger>
 
@@ -186,7 +188,7 @@ export default function AddCloudResourceForm({
 
               <Select
                 value={selectedResourceId}
-                onValueChange={setSelectedResourceId}
+                onValueChange={(value) => setSelectedResourceId(value ?? "")}
                 disabled={
                   !selectedAwsAccountId ||
                   isLoadingResources ||
@@ -197,8 +199,8 @@ export default function AddCloudResourceForm({
                   <SelectValue
                     placeholder={
                       isLoadingResources
-                        ? 'Loading resources...'
-                        : 'Select Resource'
+                        ? "Loading resources..."
+                        : "Select Resource"
                     }
                   />
                 </SelectTrigger>
@@ -207,7 +209,7 @@ export default function AddCloudResourceForm({
                   {resources.map((resource) => (
                     <SelectItem key={resource.id} value={resource.id}>
                       {resource.resourceName ?? resource.resourceIdentifier}
-                      {' · '}
+                      {" · "}
                       {resource.resourceType}
                     </SelectItem>
                   ))}
@@ -249,7 +251,7 @@ export default function AddCloudResourceForm({
                 isSubmitting || !selectedAwsAccountId || !selectedResourceId
               }
             >
-              {isSubmitting ? 'Adding...' : 'Add Resource'}
+              {isSubmitting ? "Adding..." : "Add Resource"}
             </Button>
           </DialogFooter>
         </form>

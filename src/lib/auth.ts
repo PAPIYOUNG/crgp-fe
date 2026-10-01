@@ -4,6 +4,8 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
+  session: { strategy: 'jwt', maxAge: 86370 },
+  pages: { signIn: '/login' },
   providers: [
     Credentials({
       async authorize(input) {

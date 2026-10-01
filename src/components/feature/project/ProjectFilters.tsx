@@ -68,7 +68,9 @@ export function ProjectFilters() {
     });
   }
 
-  function handleSortChange(value: string) {
+  function handleSortChange(value: string | null) {
+    if (!value) return;
+
     const [sortBy, order] = value.split(':');
 
     updateSearchParams({
@@ -132,7 +134,7 @@ export function ProjectFilters() {
           }
           disabled={isPending}
         >
-          <SelectTrigger className="w-full xl:w-[180px]">
+          <SelectTrigger className="w-full xl:w-45">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
 

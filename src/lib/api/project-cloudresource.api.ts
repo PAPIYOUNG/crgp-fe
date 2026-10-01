@@ -1,5 +1,7 @@
 import {
   CloudResourceResponse,
+  CreateCloudResourceRequest,
+  CreateCloudResourceResponse,
   GetCloudResourcesQuery,
   GetCloudResourcesResponse,
 } from '@/lib/api/api-type';
@@ -35,6 +37,10 @@ function createCloudResourceQueryString(query: GetCloudResourcesQuery): string {
 
   if (query.source) {
     params.set('source', query.source);
+  }
+
+  if (query.provider) {
+    params.set('provider', query.provider);
   }
 
   if (query.environment) {
@@ -99,6 +105,15 @@ export const cloudResourceApi = {
       `/cloud-resource?${params.toString()}`,
     );
     return response.items;
+  },
+
+  async createCloudResource(
+    data: CreateCloudResourceRequest,
+  ): Promise<CreateCloudResourceResponse> {
+    return authFetch('/cloud-resource', {
+      method: 'POST',
+      body: data,
+    });
   },
 
   async editCloudResource(

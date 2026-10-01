@@ -5,6 +5,8 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +37,15 @@ import {
   formatBudgetDisplay,
   parseBudgetInput,
 } from '@/lib/utils/budget-input';
+import { CreateResourceManual } from '@/lib/action/cloud-resource.action';
+
+const providerOptions = [
+  { value: 'AWS', label: 'AWS' },
+  { value: 'AZURE', label: 'Azure' },
+  { value: 'GCP', label: 'Google Cloud' },
+  { value: 'ON_PREM', label: 'On-Premises' },
+  { value: 'OTHER', label: 'Other' },
+] as const;
 
 const serviceOptions = [
   { value: 'EC2', label: 'EC2' },
@@ -75,7 +86,10 @@ const statusOptions = [
   { value: 'TERMINATED', label: 'Terminated' },
 ] as const;
 
-const selectableOption = <T extends string>(values: readonly T[], message: string) =>
+const selectableOption = <T extends string>(
+  values: readonly T[],
+  message: string,
+) =>
   z
     .union([z.enum(values as unknown as [T, ...T[]]), z.literal('')])
     .refine((value) => value !== '', { message });
@@ -83,63 +97,96 @@ const selectableOption = <T extends string>(values: readonly T[], message: strin
 const optionalText = (max: number, message: string) =>
   z.string().trim().max(max, message).optional().or(z.literal(''));
 
-const cloudResourceSchema = z.object({
-  resourceName: z
-    .string()
-    .trim()
-    .min(1, 'Resource name is required')
-    .max(100, 'Resource name must not exceed 100 characters'),
-
-  service: selectableOption(
-    serviceOptions.map((option) => option.value),
-    'Service is required',
-  ),
-
-  instanceType: optionalText(100, 'Type must not exceed 100 characters'),
-
-  region: selectableOption(
-    regionOptions.map((option) => option.value),
-    'Region is required',
-  ),
-
-  projectId: z
-    .union([z.enum(projectOptions.map((option) => option.value) as [string, ...string[]]), z.literal('')])
-    .optional()
-    .or(z.literal('')),
-
-  environment: z
-    .union([z.enum(['DEV', 'UAT', 'STAGING', 'PRODUCTION']), z.literal('')])
-    .optional()
-    .or(z.literal('')),
-
-  status: z
-    .union([
-      z.enum(['RUNNING', 'STOPPED', 'PENDING', 'TERMINATED']),
-      z.literal(''),
-    ])
-    .optional()
-    .or(z.literal('')),
-
-  monthlyCost: z
-    .string()
-    .trim()
-    .optional()
-    .or(z.literal(''))
-    .refine(
-      (value) => !value || /^\d+(\.\d{1,2})?$/.test(value),
-      'Enter a valid amount, e.g. 145.90',
+const cloudResourceSchema = z
+  .object({
+    provider: selectableOption(
+      providerOptions.map((option) => option.value),
+      'Provider is required',
     ),
 
-  description: optionalText(500, 'Description must not exceed 500 characters'),
-});
+    // จำเป็นเฉพาะตอน provider เป็น AWS เท่านั้น ตรวจสอบเพิ่มด้านล่างด้วย superRefine
+    awsAccountId: z.string().optional().or(z.literal('')),
 
-type CloudResourceInput = z.infer<typeof cloudResourceSchema>;
+    resourceName: z
+      .string()
+      .trim()
+      .min(1, 'Resource name is required')
+      .max(100, 'Resource name must not exceed 100 characters'),
+
+    service: selectableOption(
+      serviceOptions.map((option) => option.value),
+      'Service is required',
+    ),
+
+    instanceType: optionalText(100, 'Type must not exceed 100 characters'),
+
+    // Region เป็น dropdown ของ AWS เมื่อ provider เป็น AWS และเป็น free text เมื่อไม่ใช่
+    region: z
+      .string()
+      .trim()
+      .min(1, 'Region is required')
+      .max(50, 'Region must not exceed 50 characters'),
+
+    projectId: z
+      .union([
+        z.enum(
+          projectOptions.map((option) => option.value) as [
+            string,
+            ...string[],
+          ],
+        ),
+        z.literal(''),
+      ])
+      .optional()
+      .or(z.literal('')),
+
+    environment: z
+      .union([z.enum(['DEV', 'UAT', 'STAGING', 'PRODUCTION']), z.literal('')])
+      .optional()
+      .or(z.literal('')),
+
+    status: z
+      .union([
+        z.enum(['RUNNING', 'STOPPED', 'PENDING', 'TERMINATED']),
+        z.literal(''),
+      ])
+      .optional()
+      .or(z.literal('')),
+
+    monthlyCost: z
+      .string()
+      .trim()
+      .optional()
+      .or(z.literal(''))
+      .refine(
+        (value) => !value || /^\d+(\.\d{1,2})?$/.test(value),
+        'Enter a valid amount, e.g. 145.90',
+      ),
+
+    description: optionalText(
+      500,
+      'Description must not exceed 500 characters',
+    ),
+  })
+  .superRefine((data, ctx) => {
+    if (data.provider === 'AWS' && !data.awsAccountId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please select an AWS account',
+        path: ['awsAccountId'],
+      });
+    }
+  });
+
+export type CloudResourceInput = z.infer<typeof cloudResourceSchema>;
 
 const defaultValues: CloudResourceInput = {
+  provider: 'AWS',
+  awsAccountId: '',
   resourceName: '',
   service: '' as CloudResourceInput['service'],
   instanceType: '',
-  region: '' as CloudResourceInput['region'],
+  region: '',
   projectId: '',
   environment: '',
   status: 'RUNNING',
@@ -147,7 +194,20 @@ const defaultValues: CloudResourceInput = {
   description: '',
 };
 
-export default function CloudResourceForm() {
+type AwsAccountOption = {
+  id: string;
+  awsAccountId: string;
+  accountName: string;
+};
+
+type CloudResourceFormProps = {
+  awsAccounts: AwsAccountOption[];
+};
+
+export default function CloudResourceForm({
+  awsAccounts,
+}: CloudResourceFormProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -156,11 +216,16 @@ export default function CloudResourceForm() {
     control,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CloudResourceInput>({
     resolver: zodResolver(cloudResourceSchema),
     defaultValues,
   });
+
+  const provider = watch('provider');
+  const isAwsProvider = provider === 'AWS';
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -173,9 +238,19 @@ export default function CloudResourceForm() {
     setIsSubmitting(true);
 
     try {
-      // TODO: wire up to the create-cloud-resource API once it's available.
-      console.log('Add resource payload', data);
+      const result = await CreateResourceManual(data);
+
+      if (!result.success) {
+        toast.error('Failed to add resource', {
+          description: result.message,
+        });
+
+        return;
+      }
+
+      toast.success('Cloud resource added');
       handleOpenChange(false);
+      router.refresh();
     } finally {
       setIsSubmitting(false);
     }
@@ -196,11 +271,103 @@ export default function CloudResourceForm() {
           <DialogHeader>
             <DialogTitle>Add Cloud Resource</DialogTitle>
             <DialogDescription>
-              Resource Name, Service and Region are required.
+              Provider, Resource Name, Service and Region are required. AWS
+              Account is required only when Provider is AWS.
             </DialogDescription>
           </DialogHeader>
 
           <FieldGroup className="mt-4">
+            <Field data-invalid={!!errors.provider}>
+              <FieldLabel htmlFor="provider">
+                Provider <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Controller
+                control={control}
+                name="provider"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+
+                      if (value !== 'AWS') {
+                        setValue('awsAccountId', '');
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      id="provider"
+                      className="w-full"
+                      aria-invalid={!!errors.provider}
+                    >
+                      <SelectValue placeholder="Select provider">
+                        {(value: string) =>
+                          value
+                            ? (providerOptions.find(
+                                (option) => option.value === value,
+                              )?.label ?? value)
+                            : 'Select provider'
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {providerOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.provider && (
+                <FieldError errors={[{ message: errors.provider.message }]} />
+              )}
+            </Field>
+
+            {isAwsProvider && (
+              <Field data-invalid={!!errors.awsAccountId}>
+                <FieldLabel htmlFor="awsAccountId">
+                  AWS Account <span className="text-destructive">*</span>
+                </FieldLabel>
+                <Controller
+                  control={control}
+                  name="awsAccountId"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger
+                        id="awsAccountId"
+                        className="w-full"
+                        aria-invalid={!!errors.awsAccountId}
+                      >
+                        <SelectValue placeholder="Select AWS account">
+                          {(value: string) =>
+                            value
+                              ? (awsAccounts.find(
+                                  (account) => account.id === value,
+                                )?.accountName ?? value)
+                              : 'Select AWS account'
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {awsAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.accountName} ({account.awsAccountId})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.awsAccountId && (
+                  <FieldError
+                    errors={[{ message: errors.awsAccountId.message }]}
+                  />
+                )}
+              </Field>
+            )}
+
             <Field data-invalid={!!errors.resourceName}>
               <FieldLabel htmlFor="resourceName">
                 Resource Name <span className="text-destructive">*</span>
@@ -279,28 +446,40 @@ export default function CloudResourceForm() {
                 <FieldLabel htmlFor="region">
                   Region <span className="text-destructive">*</span>
                 </FieldLabel>
-                <Controller
-                  control={control}
-                  name="region"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger
-                        id="region"
-                        className="w-full"
-                        aria-invalid={!!errors.region}
+                {isAwsProvider ? (
+                  <Controller
+                    control={control}
+                    name="region"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
                       >
-                        <SelectValue placeholder="Select region" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {regionOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
+                        <SelectTrigger
+                          id="region"
+                          className="w-full"
+                          aria-invalid={!!errors.region}
+                        >
+                          <SelectValue placeholder="Select region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {regionOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                ) : (
+                  <Input
+                    id="region"
+                    placeholder="e.g. eastus, europe-west1, dc-1"
+                    aria-invalid={!!errors.region}
+                    {...register('region')}
+                  />
+                )}
                 {errors.region && (
                   <FieldError errors={[{ message: errors.region.message }]} />
                 )}
@@ -312,10 +491,7 @@ export default function CloudResourceForm() {
                   control={control}
                   name="status"
                   render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger id="status" className="w-full">
                         <SelectValue placeholder="Select status">
                           {(value: string) =>
@@ -347,10 +523,7 @@ export default function CloudResourceForm() {
                   control={control}
                   name="projectId"
                   render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger id="projectId" className="w-full">
                         <SelectValue placeholder="Unassigned">
                           {(value: string) =>
@@ -380,10 +553,7 @@ export default function CloudResourceForm() {
                   control={control}
                   name="environment"
                   render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger id="environment" className="w-full">
                         <SelectValue placeholder="Select environment">
                           {(value: string) =>
