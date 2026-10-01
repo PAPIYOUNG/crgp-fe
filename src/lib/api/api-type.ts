@@ -112,7 +112,7 @@ export type CreateProjectRequest = {
   description: string | null;
   businessDepartment: Department;
   technicalDepartment: Department;
-  monthlyBudget: string | null;
+  monthlyBudget: number | null;
   budgetCurrency: string;
   startDate: string | null;
   endDate: string | null;
@@ -120,14 +120,14 @@ export type CreateProjectRequest = {
 
 export type UpdateProjectRequest = {
   projectName?: string;
-  description?: string;
+  description?: string | null;
   businessDepartment?: Department;
   technicalDepartment?: Department;
-  monthlyBudget?: number;
+  monthlyBudget?: number | null;
   budgetCurrency?: string;
   status?: ProjectStatus;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 //Filter Project
@@ -606,6 +606,7 @@ export type UserOptionResponse = {
   email: string;
   avatarUrl: string | null;
   department: Department;
+  status: 'ACTIVE' | 'INACTIVE';
 };
 
 export type GetOptionUsersResponse = UserOptionResponse[];

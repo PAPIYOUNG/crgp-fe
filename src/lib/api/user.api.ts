@@ -17,7 +17,7 @@ export const userApi = {
   async uploadAvatar(file: File) {
     const formData = new FormData();
     formData.append('avatar', file);
-    return authFetch('/user/avatar', { method: 'PATCH', body: formData });
+    return authFetch<string>('/user/avatar', { method: 'PATCH', body: formData });
   },
 
   async editProfile(input: EditProfile) {

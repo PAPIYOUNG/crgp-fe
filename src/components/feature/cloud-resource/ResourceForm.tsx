@@ -21,5 +21,5 @@ type ResourceFormProps = {
 export default function ResourceForm({ resourceId }: ResourceFormProps) {
   //console.log('resourceId:', resourceId);
 
-  return;
+  return null;
 }

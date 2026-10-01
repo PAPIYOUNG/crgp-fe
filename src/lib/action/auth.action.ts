@@ -58,7 +58,7 @@ export async function registerAction(
   } catch (error) {
     console.log('error', error);
     if (error instanceof ApiError) {
-      if (error.statusCode === 409) {
+      if (error.status === 409) {
         return {
           success: false,
           message: 'Email already in use',

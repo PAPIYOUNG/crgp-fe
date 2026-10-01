@@ -208,7 +208,9 @@ export function CloudResourceFilters() {
     });
   }
 
-  function handleSortChange(value: string) {
+  function handleSortChange(value: string | null) {
+    if (!value) return;
+
     const [sortBy, order] = value.split(':');
 
     updateSearchParams({

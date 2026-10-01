@@ -25,10 +25,6 @@ function createCloudResourceQueryString(query: GetCloudResourcesQuery): string {
     params.set('service', query.service);
   }
 
-  if (query.status) {
-    params.set('status', query.status);
-  }
-
   if (query.region) {
     params.set('region', query.region);
   }

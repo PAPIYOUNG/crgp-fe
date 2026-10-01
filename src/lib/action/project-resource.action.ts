@@ -87,12 +87,12 @@ export async function removeResourceFromProjectAction(
     revalidatePath(`/project/${projectId}`);
 
     return {
-      success: true,
+      success: true as const,
     };
   } catch (error) {
     if (error instanceof ApiError) {
       return {
-        success: false,
+        success: false as const,
         message: error.message,
       };
     }
